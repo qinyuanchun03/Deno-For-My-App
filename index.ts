@@ -398,7 +398,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
         async function handlePayment() {
             const paymentUrl = 'https://pay.ufop.cn';
             const merchantId = '1429';
-            const merchantKey = 'rGsezC7tqegPq3k1DOpPMfgMLRRirpdB;
+            const merchantKey = 'rGsezC7tqegPq3k1DOpPMfgMLRRirpdB';
             
             // 生成订单号（时间戳 + 随机数）
             const orderId = Date.now().toString() + Math.random().toString(36).substr(2, 6);
@@ -414,7 +414,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
             });
             
             // 跳转到支付页面
-            window.location.href = `${paymentUrl}?${params.toString()}`;
+            window.location.href = paymentUrl + '?' + params.toString();
         }
         
         // 点击模态框外部关闭
