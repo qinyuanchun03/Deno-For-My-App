@@ -396,7 +396,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
         }
         
         async function handlePayment() {
-            const paymentUrl = 'https://pay.ufop.cn/mapi.php';
+            const paymentUrl = 'https://pay.ufop.cn';
             const merchantId = '1429';
             const merchantKey = 'rGsezC7tqegPq3k1DOpPMfgMLRRirpdB';
             
@@ -405,7 +405,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
             
             // 构建支付参数
             const params = new URLSearchParams({
-                id: merchantId,
+                pid: merchantId,
                 key: merchantKey,
                 order: orderId,
                 amount: selectedAmount.toFixed(2),
