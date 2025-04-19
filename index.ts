@@ -1,6 +1,17 @@
 import { Application, Router, send } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import { oakCors } from "https://deno.land/x/cors@v1.2.2/mod.ts";
 
+// Deno namespace declaration to fix linter errors
+declare namespace Deno {
+  export function openKv(): Promise<any>;
+  export function cwd(): string;
+  export interface Env {
+    get(key: string): string | undefined;
+    set(key: string, value: string): void;
+  }
+  export const env: Env;
+}
+
 // HTML模板
 const HTML_TEMPLATE = `<!DOCTYPE html>
 <html lang="zh">
@@ -282,6 +293,10 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
                 <h2>已过滤结果</h2>
                 <div class="stat-value" id="filteredResults">-</div>
             </div>
+            <div class="stat-card">
+                <h2>累计捐赠</h2>
+                <div class="stat-value" id="totalDonations">-</div>
+            </div>
         </div>
         
         <p class="update-time" id="lastUpdated">最后更新时间：-</p>
@@ -365,6 +380,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
                 
                 document.getElementById('installations').textContent = formatNumber(data.installations);
                 document.getElementById('filteredResults').textContent = formatNumber(data.filteredResults);
+                document.getElementById('totalDonations').textContent = data.donations?.total ? '¥' + formatNumber(data.donations.total) : '-';
                 document.getElementById('lastUpdated').textContent = '最后更新时间：' + formatDate(data.lastUpdated);
             } catch (error) {
                 console.error('Error fetching stats:', error);
@@ -398,7 +414,6 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
         async function handlePayment() {
             // 构建支付请求
             const payData = {
-                pid: '1429',
                 money: selectedAmount.toFixed(2),
                 name: '支持「干净的页面」插件开发',
                 type: 'alipay',
@@ -408,13 +423,30 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
             };
 
             try {
+                // 获取支付签名和配置
+                const signResponse = await fetch('/payment/sign', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payData)
+                });
+                
+                if (!signResponse.ok) {
+                    const errorData = await signResponse.json();
+                    throw new Error(errorData.error || '获取签名失败');
+                }
+                
+                const paymentData = await signResponse.json();
+                
                 // 创建表单
                 const form = document.createElement('form');
                 form.method = 'POST';
-                form.action = 'https://pay.ufop.cn/mapi.php';
+                form.action = paymentData.gateway || 'https://pay.ufop.cn/submit.php';
                 
-                // 添加支付参数
-                Object.entries(payData).forEach(([key, value]) => {
+                // 添加支付参数（包括签名）
+                const allData = paymentData.payData;
+                Object.entries(allData).forEach(([key, value]) => {
                     const input = document.createElement('input');
                     input.type = 'hidden';
                     input.name = key;
@@ -428,7 +460,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
                 document.body.removeChild(form);
             } catch (error) {
                 console.error('支付请求失败:', error);
-                alert('支付请求失败，请稍后重试');
+                alert('支付请求失败: ' + (error.message || '请联系管理员'));
             }
         }
         
@@ -556,10 +588,17 @@ router.post("/stats", async (ctx) => {
 router.get("/stats/summary", async (ctx) => {
   try {
     const stats = await getStats();
+    const totalDonations = (await kv.get(["stats", "totalDonations"])).value as number || 0;
+    const lastDonation = (await kv.get(["stats", "lastDonation"])).value || null;
+    
     ctx.response.body = {
       installations: stats.installations,
       filteredResults: stats.filteredResults,
-      lastUpdated: stats.lastUpdated
+      lastUpdated: stats.lastUpdated,
+      donations: {
+        total: totalDonations,
+        lastDonation
+      }
     };
   } catch (error) {
     console.error("Error fetching stats:", error);
@@ -568,27 +607,79 @@ router.get("/stats/summary", async (ctx) => {
   }
 });
 
-// 添加支付通知处理路由
+// 支付相关路由 - 极简化版本
+router.post("/payment/sign", async (ctx) => {
+    try {
+        const body = ctx.request.body();
+        const payData = await body.value;
+        
+        // 硬编码商户信息
+        const PID = "1429";
+        const KEY = "rGsezC7tqegPq3k1D0pPMfgMLRRirpdB";
+        
+        // 构建支付数据
+        const fullPayData = {
+            ...payData,
+            pid: PID,
+        };
+        
+        // 按照参数名ASCII码从小到大排序
+        const sortedParams = Object.entries(fullPayData)
+            .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+            .reduce((result, [k, value]) => {
+                result += `${k}=${value}&`;
+                return result;
+            }, "");
+        
+        // 添加密钥
+        const signString = sortedParams + `key=${KEY}`;
+        
+        // 计算MD5值
+        const encoder = new TextEncoder();
+        const data = encoder.encode(signString);
+        const hashBuffer = await crypto.subtle.digest('MD5', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const sign = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+        
+        console.log("支付参数:", fullPayData);
+        console.log("生成的签名:", sign);
+        
+        // 返回完整的支付数据和签名
+        ctx.response.body = { 
+            sign,
+            payData: {
+                ...fullPayData,
+                sign
+            },
+            gateway: "https://pay.ufop.cn/submit.php"
+        };
+    } catch (error) {
+        console.error("生成支付签名错误:", error);
+        ctx.response.status = 500;
+        ctx.response.body = { error: "生成支付签名失败" };
+    }
+});
+
+// 支付通知处理 - 简化版
 router.get("/notify_url", async (ctx) => {
     try {
         const params = ctx.request.url.searchParams;
+        console.log("收到支付通知:", Object.fromEntries(params.entries()));
+        
+        // 简单记录交易信息
         const trade_no = params.get('trade_no');
-        const out_trade_no = params.get('out_trade_no');
-        const type = params.get('type');
-        const trade_status = params.get('trade_status');
-        const sign = params.get('sign');
-
-        // TODO: 验证签名
-
-        if (trade_status === 'TRADE_SUCCESS') {
-            // 支付成功，更新订单状态
-            console.log('Payment success:', { trade_no, out_trade_no, type });
+        const money = params.get('money');
+        if (trade_no && money) {
+            await kv.set(["donations", trade_no], {
+                amount: parseFloat(money),
+                timestamp: Date.now()
+            });
         }
-
+        
         // 返回成功
         ctx.response.body = 'success';
     } catch (error) {
-        console.error('Notify error:', error);
+        console.error('支付通知处理错误:', error);
         ctx.response.status = 500;
         ctx.response.body = 'fail';
     }
@@ -611,6 +702,7 @@ app.addEventListener("error", (evt) => {
 
 // 启动服务器
 const port = parseInt(Deno.env.get("PORT") || "8000");
-console.log(`Server running on port ${port}`);
+console.log(`服务器将运行在端口 ${port}`);
 
+// 初始化服务
 await app.listen({ port }); 
