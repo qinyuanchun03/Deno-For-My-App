@@ -396,25 +396,45 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
         }
         
         async function handlePayment() {
+            // 基础配置（使用软件通讯密钥）
+            const config = {
+                pid: '1429',
+                key: 'KekqLjP7VtvCTsU7rirn7fH4yUNxB1q6'  // 使用软件通讯密钥
+            };
+            
             // 基础支付参数
             const payParams = {
-                pid: '1429',
+                pid: config.pid,
                 type: 'alipay',
                 out_trade_no: Date.now().toString(),
                 name: '测试商品',
                 money: '0.01',
                 notify_url: 'https://qinyuanchun-deno-for-my-66.deno.dev/notify_url',
-                return_url: window.location.href
+                return_url: window.location.href,
+                sign_type: 'MD5'
             };
 
             try {
+                // 生成签名字符串
+                const signStr = Object.entries(payParams)
+                    .filter(([k]) => k !== 'sign_type')
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([k, v]) => k + '=' + v)
+                    .join('&') + config.key;
+                    
+                // 计算MD5
+                const sign = await crypto.subtle.digest('MD5', new TextEncoder().encode(signStr))
+                    .then(buf => Array.from(new Uint8Array(buf))
+                    .map(b => b.toString(16).padStart(2, '0'))
+                    .join(''));
+
                 // 创建表单
                 const form = document.createElement('form');
                 form.method = 'POST';
                 form.action = 'https://pay.ufop.cn/submit.php';
                 
-                // 添加参数
-                Object.entries(payParams).forEach(([key, value]) => {
+                // 添加所有参数包括签名
+                Object.entries({ ...payParams, sign }).forEach(([key, value]) => {
                     const input = document.createElement('input');
                     input.type = 'hidden';
                     input.name = key;
@@ -422,7 +442,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
                     form.appendChild(input);
                 });
                 
-                // 提交
+                // 提交表单
                 document.body.appendChild(form);
                 form.submit();
                 document.body.removeChild(form);
