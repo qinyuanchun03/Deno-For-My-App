@@ -1,12 +1,33 @@
 import { Application, Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import { oakCors } from "https://deno.land/x/cors@v1.2.2/mod.ts";
 
-// 统计数据（内存对象，可扩展为数据库持久化）
+const STATS_FILE = "./stats.json";
+
+// 加载或初始化统计数据
 let stats = {
   total_installs: 0,
   filtered_results: 0,
-  last_update: new Date().toLocaleString("zh-CN", { hour12: false })
+  last_update: new Date().toLocaleString("zh-CN", { hour12: false }),
+  clients: new Set()
 };
+
+try {
+  const data = await Deno.readTextFile(STATS_FILE);
+  const obj = JSON.parse(data);
+  stats.total_installs = obj.total_installs || 0;
+  stats.filtered_results = obj.filtered_results || 0;
+  stats.last_update = obj.last_update || stats.last_update;
+  stats.clients = new Set(obj.clients || []);
+} catch {}
+
+async function saveStats() {
+  await Deno.writeTextFile(STATS_FILE, JSON.stringify({
+    total_installs: stats.total_installs,
+    filtered_results: stats.filtered_results,
+    last_update: stats.last_update,
+    clients: Array.from(stats.clients)
+  }));
+}
 
 const app = new Application();
 const router = new Router();
@@ -93,18 +114,26 @@ router.get("/", (ctx) => {
 // JSON统计接口
 router.get("/api/stats", (ctx) => {
   ctx.response.headers.set("content-type", "application/json; charset=utf-8");
-  ctx.response.body = stats;
+  ctx.response.body = {
+    total_installs: stats.total_installs,
+    filtered_results: stats.filtered_results,
+    last_update: stats.last_update
+  };
 });
 
 // 统计数据上报接口
 router.post("/api/stats", async (ctx) => {
   const body = await ctx.request.body({ type: "json" }).value;
-  if (body.type === "install") {
-    stats.total_installs++;
+  if (body.type === "install" && body.clientId) {
+    if (!stats.clients.has(body.clientId)) {
+      stats.total_installs++;
+      stats.clients.add(body.clientId);
+    }
   } else if (body.type === "filter") {
     stats.filtered_results += body.count || 1;
   }
   stats.last_update = new Date().toLocaleString("zh-CN", { hour12: false });
+  await saveStats();
   ctx.response.body = { success: true };
 });
 
