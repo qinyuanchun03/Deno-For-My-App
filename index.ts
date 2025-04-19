@@ -1,4 +1,4 @@
-import { Application, Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
+import { Application, Router, send } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 import { oakCors } from "https://deno.land/x/cors@v1.2.2/mod.ts";
 
 // HTML模板
@@ -32,7 +32,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
         }
         
         .container {
-            max-width: 800px;
+            max-width: 1000px;
             margin: 0 auto;
         }
         
@@ -78,13 +78,20 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
             text-align: center;
             color: #666;
             font-size: 0.9rem;
+            margin-bottom: 2rem;
+        }
+        
+        .info-section {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 2rem;
+            margin-top: 2rem;
         }
         
         .description {
             background: var(--card-background);
             border-radius: 12px;
             padding: 1.5rem;
-            margin-top: 2rem;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
@@ -93,13 +100,60 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
             margin-bottom: 1rem;
         }
         
-        @media (max-width: 600px) {
+        .contact-info {
+            background: var(--card-background);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .contact-info h2 {
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+        }
+        
+        .qr-code {
+            max-width: 200px;
+            margin: 1rem auto;
+            border-radius: 8px;
+        }
+        
+        .github-link {
+            display: inline-block;
+            margin-top: 1rem;
+            padding: 0.5rem 1rem;
+            background-color: #24292e;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: background-color 0.2s;
+        }
+        
+        .github-link:hover {
+            background-color: #1a1f24;
+        }
+        
+        .github-icon {
+            margin-right: 0.5rem;
+            vertical-align: middle;
+        }
+        
+        @media (max-width: 768px) {
+            .info-section {
+                grid-template-columns: 1fr;
+            }
+            
             body {
                 padding: 1rem;
             }
             
             .stats-grid {
                 grid-template-columns: 1fr;
+            }
+            
+            .qr-code {
+                max-width: 150px;
             }
         }
     </style>
@@ -124,9 +178,24 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
         
         <p class="update-time" id="lastUpdated">最后更新时间：-</p>
         
-        <div class="description">
-            <h2>关于本插件</h2>
-            <p>「干净的页面」是一个浏览器扩展，帮助用户过滤搜索结果中的无用站点。它支持自定义规则，让您的搜索结果更加清晰有效。</p>
+        <div class="info-section">
+            <div class="description">
+                <h2>关于本插件</h2>
+                <p>「干净的页面」是一个浏览器扩展，帮助用户过滤搜索结果中的无用站点。它支持自定义规则，让您的搜索结果更加清晰有效。</p>
+                <p style="margin-top: 1rem;">
+                    <a href="https://github.com/qinyuanchun03/ResultClean/" class="github-link" target="_blank">
+                        <svg class="github-icon" height="16" viewBox="0 0 16 16" width="16" fill="currentColor">
+                            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                        </svg>
+                        GitHub 仓库
+                    </a>
+                </p>
+            </div>
+            <div class="contact-info">
+                <h2>联系作者</h2>
+                <img src="/wechat.jpg" alt="关注作者的公众号" class="qr-code">
+                <p>扫码关注作者</p>
+            </div>
         </div>
     </div>
     
@@ -222,6 +291,17 @@ async function updateStats(updates: Partial<Stats>) {
 
 const app = new Application();
 const router = new Router();
+
+// 静态文件服务
+app.use(async (context, next) => {
+  if (context.request.url.pathname.startsWith('/static')) {
+    await send(context, context.request.url.pathname, {
+      root: `${Deno.cwd()}/static`,
+    });
+  } else {
+    await next();
+  }
+});
 
 // 根路径返回统计页面
 router.get("/", (ctx) => {
