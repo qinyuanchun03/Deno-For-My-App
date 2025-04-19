@@ -407,7 +407,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
             // 生成订单号（时间戳 + 4位随机数）
             const timestamp = Date.now();
             const random = Math.floor(1000 + Math.random() * 9000);
-            const orderId = `${timestamp}${random}`;
+            const orderId = timestamp.toString() + random.toString();
             
             // 构建支付参数对象
             const payParams = {
