@@ -426,7 +426,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
                            value !== '';
                 })
                 .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
-                .map(([key, value]) => `${key}=${value}`)
+                .map(([key, value]) => key + '=' + value)
                 .join('&');
 
             // 计算签名：md5(signParams + KEY)
