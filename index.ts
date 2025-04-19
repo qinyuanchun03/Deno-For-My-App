@@ -396,44 +396,33 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
         }
         
         async function handlePayment() {
-            // 支付基础配置
-            const PAY_CONFIG = {
-                API_URL: 'https://pay.ufop.cn/submit.php',
-                PID: '1429',
-                KEY: 'rGsezC7tqegPq3k1DOpPMfgMLRRirpdB',
-                NOTIFY_URL: 'https://qinyuanchun-deno-for-my-66.deno.dev/notify_url'
-            };
-            
-            // 生成简单订单号（时间戳）
-            const orderId = Date.now().toString();
-            
-            // 构建基础支付参数
+            // 基础支付参数
             const payParams = {
-                pid: PAY_CONFIG.PID,
+                pid: '1429',
                 type: 'alipay',
-                out_trade_no: orderId,
-                name: '支持「干净的页面」插件开发',
-                money: selectedAmount.toFixed(2),
-                notify_url: PAY_CONFIG.NOTIFY_URL,
+                out_trade_no: Date.now().toString(),
+                name: '测试商品',
+                money: '0.01',
+                notify_url: 'https://qinyuanchun-deno-for-my-66.deno.dev/notify_url',
                 return_url: window.location.href
             };
 
             try {
-                // 创建支付表单
+                // 创建表单
                 const form = document.createElement('form');
                 form.method = 'POST';
-                form.action = PAY_CONFIG.API_URL;
+                form.action = 'https://pay.ufop.cn/submit.php';
                 
-                // 添加所有参数到表单
+                // 添加参数
                 Object.entries(payParams).forEach(([key, value]) => {
                     const input = document.createElement('input');
                     input.type = 'hidden';
                     input.name = key;
-                    input.value = value.toString();
+                    input.value = value;
                     form.appendChild(input);
                 });
                 
-                // 提交表单
+                // 提交
                 document.body.appendChild(form);
                 form.submit();
                 document.body.removeChild(form);
