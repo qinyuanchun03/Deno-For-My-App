@@ -411,7 +411,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
                 // 创建表单
                 const form = document.createElement('form');
                 form.method = 'POST';
-                form.action = 'https://pay.ufop.cn/submit.php';
+                form.action = 'https://pay.ufop.cn/';
                 
                 // 添加支付参数
                 Object.entries(payData).forEach(([key, value]) => {
