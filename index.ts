@@ -139,6 +139,114 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
             vertical-align: middle;
         }
         
+        .donate-button {
+            display: inline-block;
+            margin-top: 1.5rem;
+            padding: 0.5rem 1.5rem;
+            background-color: #ff4444;
+            color: white;
+            text-decoration: none;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(255,68,68,0.2);
+        }
+        
+        .donate-button:hover {
+            background-color: #ff6666;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(255,68,68,0.3);
+        }
+        
+        .donate-button svg {
+            width: 14px;
+            height: 14px;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background: var(--card-background);
+            padding: 2rem;
+            border-radius: 12px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            position: relative;
+        }
+        
+        .modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            cursor: pointer;
+            font-size: 1.5rem;
+            color: #666;
+            line-height: 1;
+        }
+        
+        .amount-options {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+        
+        .amount-option {
+            padding: 0.5rem;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .amount-option:hover, .amount-option.selected {
+            border-color: var(--primary-color);
+            background-color: rgba(66,133,244,0.1);
+        }
+        
+        .amount-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+        
+        .amount-label {
+            font-size: 0.8rem;
+            color: #666;
+        }
+        
+        .pay-button {
+            display: inline-block;
+            margin-top: 1rem;
+            padding: 0.8rem 2rem;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .pay-button:hover {
+            background-color: #3367d6;
+            transform: translateY(-2px);
+        }
+        
         @media (max-width: 768px) {
             .info-section {
                 grid-template-columns: 1fr;
@@ -193,9 +301,38 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
             </div>
             <div class="contact-info">
                 <h2>联系作者</h2>
-                <img src="/wechat.jpg" alt="关注作者的公众号" class="qr-code">
+                <img src="https://img.picgo.net/2024/12/22/vxtcb23d7282c0adba7.jpg" alt="关注作者的公众号" class="qr-code">
                 <p>扫码关注作者</p>
+                <a href="#" class="donate-button" onclick="showDonateModal(event)">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4M11,17V16H9V14H13V13H10A1,1 0 0,1 9,12V9A1,1 0 0,1 10,8H11V7H13V8H15V10H11V11H14A1,1 0 0,1 15,12V15A1,1 0 0,1 14,16H13V17H11Z" />
+                    </svg>
+                    支持作者
+                </a>
             </div>
+        </div>
+    </div>
+    
+    <div id="donateModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeDonateModal()">&times;</span>
+            <h2>支持作者</h2>
+            <p style="margin: 1rem 0">您的支持是我持续更新的动力！</p>
+            <div class="amount-options">
+                <div class="amount-option" onclick="selectAmount(6.66)">
+                    <div class="amount-value">6.66</div>
+                    <div class="amount-label">一杯奶茶</div>
+                </div>
+                <div class="amount-option" onclick="selectAmount(16.66)">
+                    <div class="amount-value">16.66</div>
+                    <div class="amount-label">一顿午餐</div>
+                </div>
+                <div class="amount-option" onclick="selectAmount(66.66)">
+                    <div class="amount-value">66.66</div>
+                    <div class="amount-label">一份温暖</div>
+                </div>
+            </div>
+            <button class="pay-button" onclick="handlePayment()">确认支付</button>
         </div>
     </div>
     
@@ -233,6 +370,59 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
                 console.error('Error fetching stats:', error);
             }
         }
+        
+        // 打赏相关功能
+        let selectedAmount = 16.66;
+        const modal = document.getElementById('donateModal');
+        
+        function showDonateModal(event) {
+            event.preventDefault();
+            modal.style.display = 'flex';
+            selectAmount(16.66); // 默认选中中间金额
+        }
+        
+        function closeDonateModal() {
+            modal.style.display = 'none';
+        }
+        
+        function selectAmount(amount) {
+            selectedAmount = amount;
+            document.querySelectorAll('.amount-option').forEach(option => {
+                option.classList.remove('selected');
+                if (option.querySelector('.amount-value').textContent == amount) {
+                    option.classList.add('selected');
+                }
+            });
+        }
+        
+        async function handlePayment() {
+            const paymentUrl = 'https://pay.ufop.cn';
+            const merchantId = '1429';
+            const merchantKey = 'rGsezC7tqegPq3k1DOpPMfgMLRRirpdB;
+            
+            // 生成订单号（时间戳 + 随机数）
+            const orderId = Date.now().toString() + Math.random().toString(36).substr(2, 6);
+            
+            // 构建支付参数
+            const params = new URLSearchParams({
+                id: merchantId,
+                key: merchantKey,
+                order: orderId,
+                amount: selectedAmount.toFixed(2),
+                title: '支持「干净的页面」插件开发',
+                return_url: window.location.href
+            });
+            
+            // 跳转到支付页面
+            window.location.href = `${paymentUrl}?${params.toString()}`;
+        }
+        
+        // 点击模态框外部关闭
+        modal.addEventListener('click', (event) => {
+            if (event.target === modal) {
+                closeDonateModal();
+            }
+        });
         
         // 初始加载
         updateStats();
