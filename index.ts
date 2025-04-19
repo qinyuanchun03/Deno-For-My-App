@@ -396,29 +396,54 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
         }
         
         async function handlePayment() {
-            const paymentUrl = 'https://pay.ufop.cn';
             const config = {
                 pid: '1429',
-                key: 'rGsezC7tqegPq3k1DOpPMfgMLRRirpdB',
-                communication_key: 'KekqLjP7VtvCTsU7rirn7fH4yUNxB1q6'
+                key: 'rGsezC7tqegPq3k1DOpPMfgMLRRirpdB'
             };
             
             // 生成订单号（时间戳 + 随机数）
             const orderId = Date.now().toString() + Math.random().toString(36).substr(2, 6);
             
-            // 构建支付参数
-            const params = new URLSearchParams({
+            // 构建支付基础参数
+            const baseParams = {
                 pid: config.pid,
-                key: config.key,
-                order: orderId,
-                amount: selectedAmount.toFixed(2),
-                title: '支持「干净的页面」插件开发',
-                return_url: window.location.href,
-                notify_key: config.communication_key  // 添加软件通讯密钥
+                name: '支持「干净的页面」插件开发',
+                money: selectedAmount.toFixed(2),
+                type: 'alipay',
+                out_trade_no: orderId,
+                notify_url: window.location.origin + '/notify_url',  // 异步通知
+                return_url: window.location.href,  // 支付完成后跳转
+                param: 'cleanpage_donate',  // 自定义参数
+                sign_type: 'MD5'
+            };
+
+            // 按照ASCII码排序的键值对拼接
+            const signParams = Object.keys(baseParams)
+                .filter(key => key !== 'sign' && key !== 'sign_type' && baseParams[key] !== '')
+                .sort()
+                .map(key => `${key}=${baseParams[key]}`)
+                .join('&');
+
+            // 计算签名：md5(signParams + KEY)
+            const sign = await generateMD5(signParams + config.key);
+            
+            // 构建最终参数
+            const params = new URLSearchParams({
+                ...baseParams,
+                sign: sign
             });
             
             // 跳转到支付页面
-            window.location.href = paymentUrl + '?' + params.toString();
+            window.location.href = 'https://zpayz.cn/submit.php?' + params.toString();
+        }
+        
+        // MD5加密函数
+        async function generateMD5(text) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(text);
+            const hashBuffer = await crypto.subtle.digest('MD5', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         }
         
         // 点击模态框外部关闭
