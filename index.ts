@@ -13,13 +13,85 @@ declare namespace Deno {
 }
 
 // HTML模板
-const HTML_TEMPLATE = `<!DOCTYPE html>
+const HTML_TEMPLATE_ORIGINAL = `<!DOCTYPE html>
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>干净的页面 - 统计数据</title>
-    <style>
+    <title>干净的页面 - 统计数据</title>`;
+
+// 将handlePayment函数定义为单独的变量
+const HANDLE_PAYMENT_FUNCTION = `
+        async function handlePayment() {
+            // 商户信息
+            const PID = "1429";
+            const KEY = "rGsezC7tqegPq3k1D0pPMfgMLRRirpdB";
+            
+            // 构建支付请求
+            const payData = {
+                pid: PID,
+                money: selectedAmount.toFixed(2),
+                name: '支持「干净的页面」插件开发',
+                type: 'alipay',
+                out_trade_no: Date.now().toString(),
+                notify_url: window.location.origin + '/notify_url',
+                return_url: window.location.href
+            };
+
+            try {
+                // 按照参数名ASCII码从小到大排序
+                const sortedParams = Object.entries(payData)
+                    .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+                    .reduce((result, [k, value]) => {
+                        result += \`\${k}=\${value}&\`;
+                        return result;
+                    }, "");
+                
+                // 添加密钥
+                const signString = sortedParams + \`key=\${KEY}\`;
+                
+                // 计算MD5值 - 使用浏览器内置的crypto API
+                const encoder = new TextEncoder();
+                const data = encoder.encode(signString);
+                
+                // 浏览器中使用subtle crypto API计算MD5
+                const hashBuffer = await crypto.subtle.digest('MD5', data);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                const sign = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+                
+                console.log('支付参数:', payData);
+                console.log('签名字符串:', signString);
+                console.log('生成的签名:', sign);
+                
+                // 创建表单
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = 'https://pay.ufop.cn/submit.php';
+                
+                // 添加支付参数（包括签名）
+                const allData = { ...payData, sign };
+                Object.entries(allData).forEach(([key, value]) => {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = key;
+                    input.value = value;
+                    form.appendChild(input);
+                });
+                
+                // 提交支付表单
+                document.body.appendChild(form);
+                form.submit();
+                document.body.removeChild(form);
+            } catch (error) {
+                console.error('支付请求失败:', error);
+                alert('支付请求失败，请稍后再试');
+            }
+        }
+`;
+
+// 构建完整的HTML模板
+const HTML_TEMPLATE = HTML_TEMPLATE_ORIGINAL + 
+`    <style>
         :root {
             --primary-color: #4285f4;
             --text-color: #202124;
@@ -411,58 +483,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
             });
         }
         
-        async function handlePayment() {
-            // 构建支付请求
-            const payData = {
-                money: selectedAmount.toFixed(2),
-                name: '支持「干净的页面」插件开发',
-                type: 'alipay',
-                out_trade_no: Date.now().toString(),
-                notify_url: window.location.origin + '/notify_url',
-                return_url: window.location.href
-            };
-
-            try {
-                // 获取支付签名和配置
-                const signResponse = await fetch('/payment/sign', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(payData)
-                });
-                
-                if (!signResponse.ok) {
-                    const errorData = await signResponse.json();
-                    throw new Error(errorData.error || '获取签名失败');
-                }
-                
-                const paymentData = await signResponse.json();
-                
-                // 创建表单
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = paymentData.gateway || 'https://pay.ufop.cn/submit.php';
-                
-                // 添加支付参数（包括签名）
-                const allData = paymentData.payData;
-                Object.entries(allData).forEach(([key, value]) => {
-                    const input = document.createElement('input');
-                    input.type = 'hidden';
-                    input.name = key;
-                    input.value = value;
-                    form.appendChild(input);
-                });
-                
-                // 提交支付请求
-                document.body.appendChild(form);
-                form.submit();
-                document.body.removeChild(form);
-            } catch (error) {
-                console.error('支付请求失败:', error);
-                alert('支付请求失败: ' + (error.message || '请联系管理员'));
-            }
-        }
+        ${HANDLE_PAYMENT_FUNCTION}
         
         // 点击模态框外部关闭
         modal.addEventListener('click', (event) => {
@@ -607,59 +628,6 @@ router.get("/stats/summary", async (ctx) => {
   }
 });
 
-// 支付相关路由 - 极简化版本
-router.post("/payment/sign", async (ctx) => {
-    try {
-        const body = ctx.request.body();
-        const payData = await body.value;
-        
-        // 硬编码商户信息
-        const PID = "1429";
-        const KEY = "rGsezC7tqegPq3k1D0pPMfgMLRRirpdB";
-        
-        // 构建支付数据
-        const fullPayData = {
-            ...payData,
-            pid: PID,
-        };
-        
-        // 按照参数名ASCII码从小到大排序
-        const sortedParams = Object.entries(fullPayData)
-            .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
-            .reduce((result, [k, value]) => {
-                result += `${k}=${value}&`;
-                return result;
-            }, "");
-        
-        // 添加密钥
-        const signString = sortedParams + `key=${KEY}`;
-        
-        // 计算MD5值
-        const encoder = new TextEncoder();
-        const data = encoder.encode(signString);
-        const hashBuffer = await crypto.subtle.digest('MD5', data);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const sign = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
-        
-        console.log("支付参数:", fullPayData);
-        console.log("生成的签名:", sign);
-        
-        // 返回完整的支付数据和签名
-        ctx.response.body = { 
-            sign,
-            payData: {
-                ...fullPayData,
-                sign
-            },
-            gateway: "https://pay.ufop.cn/submit.php"
-        };
-    } catch (error) {
-        console.error("生成支付签名错误:", error);
-        ctx.response.status = 500;
-        ctx.response.body = { error: "生成支付签名失败" };
-    }
-});
-
 // 支付通知处理 - 简化版
 router.get("/notify_url", async (ctx) => {
     try {
@@ -668,12 +636,18 @@ router.get("/notify_url", async (ctx) => {
         
         // 简单记录交易信息
         const trade_no = params.get('trade_no');
+        const out_trade_no = params.get('out_trade_no');
         const money = params.get('money');
         if (trade_no && money) {
             await kv.set(["donations", trade_no], {
                 amount: parseFloat(money),
+                out_trade_no,
                 timestamp: Date.now()
             });
+            
+            // 更新总捐赠统计
+            const currentTotal = (await kv.get(["stats", "totalDonations"])).value as number || 0;
+            await kv.set(["stats", "totalDonations"], currentTotal + parseFloat(money));
         }
         
         // 返回成功
