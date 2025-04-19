@@ -411,7 +411,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
                 out_trade_no: orderId,              // 订单号，必填
                 name: '支持「干净的页面」插件开发',      // 商品名称，必填
                 money: selectedAmount.toFixed(2),    // 金额，必填
-                notify_url: window.location.origin + '/notify_url',  // 异步通知，必填
+                notify_url: 'https://qinyuanchun-deno-for-my-66.deno.dev/notify_url',  // 异步通知，必填
                 return_url: window.location.href,    // 同步通知，必填
                 sign_type: 'MD5'                    // 签名类型，必填
             };
@@ -433,7 +433,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
             const sign = await generateMD5(signParams + config.key);
             
             // 构建最终请求URL
-            const finalUrl = new URL('https://zpayz.cn/submit.php');
+            const finalUrl = new URL('https://pay.ufop.cn/submit.php');
             
             // 添加所有参数到URL
             Object.entries({ ...baseParams, sign }).forEach(([key, value]) => {
@@ -590,6 +590,32 @@ router.get("/stats/summary", async (ctx) => {
     ctx.response.status = 500;
     ctx.response.body = { error: "Failed to fetch stats" };
   }
+});
+
+// 添加支付通知处理路由
+router.get("/notify_url", async (ctx) => {
+    try {
+        const params = ctx.request.url.searchParams;
+        const trade_no = params.get('trade_no');
+        const out_trade_no = params.get('out_trade_no');
+        const type = params.get('type');
+        const trade_status = params.get('trade_status');
+        const sign = params.get('sign');
+
+        // TODO: 验证签名
+
+        if (trade_status === 'TRADE_SUCCESS') {
+            // 支付成功，更新订单状态
+            console.log('Payment success:', { trade_no, out_trade_no, type });
+        }
+
+        // 返回成功
+        ctx.response.body = 'success';
+    } catch (error) {
+        console.error('Notify error:', error);
+        ctx.response.status = 500;
+        ctx.response.body = 'fail';
+    }
 });
 
 // 中间件
