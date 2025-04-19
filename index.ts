@@ -396,61 +396,81 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
         }
         
         async function handlePayment() {
-            const config = {
-                pid: '1429',  // 确保PID正确
-                key: 'rGsezC7tqegPq3k1DOpPMfgMLRRirpdB'
+            // 支付配置
+            const PAY_CONFIG = {
+                API_URL: 'https://pay.ufop.cn/submit.php',
+                PID: '1429',
+                KEY: 'rGsezC7tqegPq3k1DOpPMfgMLRRirpdB',
+                NOTIFY_URL: 'https://qinyuanchun-deno-for-my-66.deno.dev/notify_url'
             };
             
-            // 生成订单号（时间戳 + 随机数）
-            const orderId = Date.now().toString() + Math.random().toString(36).substr(2, 6);
+            // 生成订单号（时间戳 + 4位随机数）
+            const timestamp = Date.now();
+            const random = Math.floor(1000 + Math.random() * 9000);
+            const orderId = `${timestamp}${random}`;
             
-            // 构建支付基础参数，确保所有必填参数都存在
-            const baseParams = {
-                pid: config.pid,                    // 商户ID，必填
-                type: 'alipay',                     // 支付方式，必填
-                out_trade_no: orderId,              // 订单号，必填
-                name: '支持「干净的页面」插件开发',      // 商品名称，必填
-                money: selectedAmount.toFixed(2),    // 金额，必填
-                notify_url: 'https://qinyuanchun-deno-for-my-66.deno.dev/notify_url',  // 异步通知，必填
-                return_url: window.location.href,    // 同步通知，必填
-                sign_type: 'MD5'                    // 签名类型，必填
+            // 构建支付参数对象
+            const payParams = {
+                pid: PAY_CONFIG.PID,
+                name: '支持「干净的页面」插件开发',
+                money: selectedAmount.toFixed(2),
+                type: 'alipay',
+                out_trade_no: orderId,
+                notify_url: PAY_CONFIG.NOTIFY_URL,
+                return_url: window.location.href,
+                sign_type: 'MD5'
             };
 
-            // 按照ASCII码排序的键值对拼接，确保不包含空值
-            const signParams = Object.entries(baseParams)
-                .filter(([key, value]) => {
-                    return key !== 'sign' && 
-                           key !== 'sign_type' && 
-                           value !== undefined && 
-                           value !== null && 
-                           value !== '';
-                })
-                .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
-                .map(([key, value]) => key + '=' + value)
-                .join('&');
-
-            // 计算签名：md5(signParams + KEY)
-            const sign = await generateMD5(signParams + config.key);
-            
-            // 构建最终请求URL
-            const finalUrl = new URL('https://pay.ufop.cn');
-            
-            // 添加所有参数到URL
-            Object.entries({ ...baseParams, sign }).forEach(([key, value]) => {
-                finalUrl.searchParams.append(key, value.toString());
-            });
-            
-            // 输出最终URL用于调试
-            console.log('Payment URL:', finalUrl.toString());
-            
-            // 跳转到支付页面
-            window.location.href = finalUrl.toString();
+            try {
+                // 1. 参数签名
+                const sign = await generatePaySign(payParams, PAY_CONFIG.KEY);
+                
+                // 2. 构建支付表单
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = PAY_CONFIG.API_URL;
+                
+                // 3. 添加所有参数
+                Object.entries({ ...payParams, sign }).forEach(([key, value]) => {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = key;
+                    input.value = value.toString();
+                    form.appendChild(input);
+                });
+                
+                // 4. 提交表单
+                document.body.appendChild(form);
+                form.submit();
+                document.body.removeChild(form);
+                
+            } catch (error) {
+                console.error('Payment error:', error);
+                alert('支付初始化失败，请稍后重试');
+            }
         }
-        
-        // MD5加密函数
-        async function generateMD5(text) {
+
+        // 生成支付签名
+        async function generatePaySign(params, key) {
+            // 1. 过滤和排序参数
+            const signStr = Object.entries(params)
+                .filter(([k, v]) => {
+                    return k !== 'sign' && 
+                           k !== 'sign_type' && 
+                           v !== '' && 
+                           v !== undefined && 
+                           v !== null;
+                })
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([k, v]) => k + '=' + v)
+                .join('&');
+            
+            // 2. 拼接密钥
+            const signContent = signStr + key;
+            
+            // 3. MD5加密
             const encoder = new TextEncoder();
-            const data = encoder.encode(text);
+            const data = encoder.encode(signContent);
             const hashBuffer = await crypto.subtle.digest('MD5', data);
             const hashArray = Array.from(new Uint8Array(hashBuffer));
             return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
