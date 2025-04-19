@@ -397,20 +397,24 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
         
         async function handlePayment() {
             const paymentUrl = 'https://pay.ufop.cn';
-            const merchantId = '1429';
-            const merchantKey = 'rGsezC7tqegPq3k1DOpPMfgMLRRirpdB';
+            const config = {
+                pid: '1429',
+                key: 'rGsezC7tqegPq3k1DOpPMfgMLRRirpdB',
+                communication_key: 'KekqLjP7VtvCTsU7rirn7fH4yUNxB1q6'
+            };
             
             // 生成订单号（时间戳 + 随机数）
             const orderId = Date.now().toString() + Math.random().toString(36).substr(2, 6);
             
             // 构建支付参数
             const params = new URLSearchParams({
-                pid: merchantId,
-                key: merchantKey,
+                pid: config.pid,
+                key: config.key,
                 order: orderId,
                 amount: selectedAmount.toFixed(2),
                 title: '支持「干净的页面」插件开发',
-                return_url: window.location.href
+                return_url: window.location.href,
+                notify_key: config.communication_key  // 添加软件通讯密钥
             });
             
             // 跳转到支付页面
