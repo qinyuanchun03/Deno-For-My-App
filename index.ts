@@ -433,7 +433,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
             const sign = await generateMD5(signParams + config.key);
             
             // 构建最终请求URL
-            const finalUrl = new URL('https://pay.ufop.cn/submit.php');
+            const finalUrl = new URL('https://pay.ufop.cn');
             
             // 添加所有参数到URL
             Object.entries({ ...baseParams, sign }).forEach(([key, value]) => {
