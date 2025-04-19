@@ -397,44 +397,54 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
         
         async function handlePayment() {
             const config = {
-                pid: '1429',
+                pid: '1429',  // 确保PID正确
                 key: 'rGsezC7tqegPq3k1DOpPMfgMLRRirpdB'
             };
             
             // 生成订单号（时间戳 + 随机数）
             const orderId = Date.now().toString() + Math.random().toString(36).substr(2, 6);
             
-            // 构建支付基础参数
+            // 构建支付基础参数，确保所有必填参数都存在
             const baseParams = {
-                pid: config.pid,
-                name: '支持「干净的页面」插件开发',
-                money: selectedAmount.toFixed(2),
-                type: 'alipay',
-                out_trade_no: orderId,
-                notify_url: window.location.origin + '/notify_url',  // 异步通知
-                return_url: window.location.href,  // 支付完成后跳转
-                param: 'cleanpage_donate',  // 自定义参数
-                sign_type: 'MD5'
+                pid: config.pid,                    // 商户ID，必填
+                type: 'alipay',                     // 支付方式，必填
+                out_trade_no: orderId,              // 订单号，必填
+                name: '支持「干净的页面」插件开发',      // 商品名称，必填
+                money: selectedAmount.toFixed(2),    // 金额，必填
+                notify_url: window.location.origin + '/notify_url',  // 异步通知，必填
+                return_url: window.location.href,    // 同步通知，必填
+                sign_type: 'MD5'                    // 签名类型，必填
             };
 
-            // 按照ASCII码排序的键值对拼接
-            const signParams = Object.keys(baseParams)
-                .filter(key => key !== 'sign' && key !== 'sign_type' && baseParams[key] !== '')
-                .sort()
-                .map(key => `${key}=${baseParams[key]}`)
+            // 按照ASCII码排序的键值对拼接，确保不包含空值
+            const signParams = Object.entries(baseParams)
+                .filter(([key, value]) => {
+                    return key !== 'sign' && 
+                           key !== 'sign_type' && 
+                           value !== undefined && 
+                           value !== null && 
+                           value !== '';
+                })
+                .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+                .map(([key, value]) => `${key}=${value}`)
                 .join('&');
 
             // 计算签名：md5(signParams + KEY)
             const sign = await generateMD5(signParams + config.key);
             
-            // 构建最终参数
-            const params = new URLSearchParams({
-                ...baseParams,
-                sign: sign
+            // 构建最终请求URL
+            const finalUrl = new URL('https://zpayz.cn/submit.php');
+            
+            // 添加所有参数到URL
+            Object.entries({ ...baseParams, sign }).forEach(([key, value]) => {
+                finalUrl.searchParams.append(key, value.toString());
             });
             
+            // 输出最终URL用于调试
+            console.log('Payment URL:', finalUrl.toString());
+            
             // 跳转到支付页面
-            window.location.href = 'https://zpayz.cn/submit.php?' + params.toString();
+            window.location.href = finalUrl.toString();
         }
         
         // MD5加密函数
